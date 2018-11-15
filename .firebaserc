@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "gather-play"
+  },
+  "targets": {
+    "gather-play": {
+      "hosting": {
+        "rocks": [
+          "gather-rocks"
+        ],
+        "play": [
+          "gather-play"
+        ]
+      }
+    }
+  }
+}
