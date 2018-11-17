@@ -17,12 +17,11 @@ export default {
   mounted () {
     const visualizer = new Visualizer(this.$el)
     visualizer.init(null)
-    Promise.all([
-      axios.get('/test.json'),
-      axios.get('/test.lrc')
-    ]).then(([analysisResponse, lyricsResponse]) => {
-      visualizer.load(analysisResponse.data, lyricsResponse.data, 0)
-    })
+    this.provider.target = visualizer
+    this.provider.start()
+  },
+  destroyed () {
+    this.provider.stop()
   },
   methods: {
     logout () {
