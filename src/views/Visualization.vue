@@ -7,7 +7,6 @@
 </template>
 
 <script>
-import axios from 'axios'
 import Visualizer from '@/visualizations'
 export default {
   name: 'visualization',
