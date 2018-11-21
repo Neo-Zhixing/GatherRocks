@@ -4,7 +4,7 @@ class Cached {
   get ttlKey () {
     return this.key + CacheTimeoutPrefix
   }
-  constructor (key, storage=window.localStorage) {
+  constructor (key, storage = window.localStorage) {
     this.key = key
     this.storage = storage
   }

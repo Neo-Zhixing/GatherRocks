@@ -1,8 +1,9 @@
 import * as THREE from 'three'
-import { Group, Vector3 } from 'three'
 import * as TWEEN from '@tweenjs/tween.js'
 import Lyrics from 'lyrics.js'
 import * as Vibrant from 'node-vibrant'
+
+import { shadeColor } from './utils'
 
 const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
 const DEFAULT_EASING_DURATION = 800
@@ -14,33 +15,6 @@ const IN_NEGATIVE_THRESHOLD = -0.2
 
 const totalChorusLayout = 1
 const totalVerseLayout = 2
-
-const pSBC = function (p, from, to) {
-  if (typeof (p) !== 'number' || p < -1 || p > 1 || typeof (from) !== 'string' || (from[0] != 'r' && from[0] != '#') || (to && typeof (to) !== 'string')) return null // ErrorCheck
-  const pSBCr = (d) => {
-    let l = d.length, RGB = {}
-    if (l > 9) {
-      d = d.split(',')
-      if (d.length < 3 || d.length > 4) return null// ErrorCheck
-      RGB[0] = i(d[0].split('(')[1]), RGB[1] = i(d[1]), RGB[2] = i(d[2]), RGB[3] = d[3] ? parseFloat(d[3]) : -1
-    } else {
-      if (l == 8 || l == 6 || l < 4) return null // ErrorCheck
-      if (l < 6) d = '#' + d[1] + d[1] + d[2] + d[2] + d[3] + d[3] + (l > 4 ? d[4] + '' + d[4] : '') // 3 or 4 digit
-      d = i(d.slice(1), 16), RGB[0] = d >> 16 & 255, RGB[1] = d >> 8 & 255, RGB[2] = d & 255, RGB[3] = -1
-      if (l == 9 || l == 5) RGB[3] = r((RGB[2] / 255) * 10000) / 10000, RGB[2] = RGB[1], RGB[1] = RGB[0], RGB[0] = d >> 24 & 255
-    }
-    return RGB
-  }
-  var i = parseInt, r = Math.round, h = from.length > 9,
-    h = typeof (to) === 'string' ? to.length > 9 ? true : to == 'c' ? !h : false : h, b = p < 0, p = b ? p * -1 : p,
-    to = to && to != 'c' ? to : b ? '#000000' : '#FFFFFF', f = pSBCr(from), t = pSBCr(to)
-  if (!f || !t) return null // ErrorCheck
-  if (h) {
-    return 'rgb' + (f[3] > -1 || t[3] > -1 ? 'a(' : '(') + r((t[0] - f[0]) * p + f[0]) + ',' + r((t[1] - f[1]) * p + f[1]) + ',' + r((t[2] - f[2]) * p + f[2]) + (f[3] < 0 && t[3] < 0 ? ')' : ',' + (f[3] > -1 && t[3] > -1 ? r(((t[3] - f[3]) * p + f[3]) * 10000) / 10000 : t[3] < 0 ? f[3] : t[3]) + ')')
-  } else {
-    return '#' + (0x100000000 + r((t[0] - f[0]) * p + f[0]) * 0x1000000 + r((t[1] - f[1]) * p + f[1]) * 0x10000 + r((t[2] - f[2]) * p + f[2]) * 0x100 + (f[3] > -1 && t[3] > -1 ? r(((t[3] - f[3]) * p + f[3]) * 255) : t[3] > -1 ? r(t[3] * 255) : f[3] > -1 ? r(f[3] * 255) : 255)).toString(16).slice(1, f[3] > -1 || t[3] > -1 ? undefined : -2)
-  }
-}
 
 export default class Circles {
   container = null
@@ -101,13 +75,13 @@ export default class Circles {
     this.animate()
   }
 
-  load (analysis, lyrics, time, cover){
+  load (analysis, lyrics, time, cover) {
     this.isLoaded = false
     this.cover = cover
 
     if (this.cover) {
       Vibrant.from(this.cover).getPalette()
-        .then((palette) => {
+        .then(palette => {
           this.color.dark = palette.DarkMuted.getHex()
           this.color.primary = palette.DarkVibrant.getHex()
           this.color.vibrant = palette.Vibrant.getHex()
@@ -148,7 +122,7 @@ export default class Circles {
       )
       this.scene.add(circle)
 
-      animateVector3(circle.position, new Vector3(0, 0, CAMERA_INITIAL_Z * 1.5), {
+      animateVector3(circle.position, new THREE.Vector3(0, 0, CAMERA_INITIAL_Z * 1.5), {
         easing: TWEEN.Easing.Linear.None,
         duration: 1000,
       })
@@ -274,7 +248,7 @@ export default class Circles {
     if (this.font !== null) {
       this.isLoaded = true
     } else {
-      setInterval( () => {
+      setInterval(() => {
         if (this.font !== null) {
           this.isLoaded = true
         }
@@ -308,7 +282,7 @@ export default class Circles {
     )
     this.scene.add(circle)
 
-    animateVector3(circle.position, new Vector3(
+    animateVector3(circle.position, new THREE.Vector3(
       this.isChorus() ? 0 : circle.position.x + (this.currentBeat === 0 ? getRandomDouble(-450, 450) : getRandomDouble(-400, 400)),
       this.isChorus() ? 0 : circle.position.y + (this.currentBeat === 0 ? getRandomDouble(-300, 300) : getRandomDouble(-250, 250)),
       circle.position.z + this.isChorus() ? 1000 : getRandomDouble(300, 600), {
@@ -338,21 +312,19 @@ export default class Circles {
     this.spawnPulse()
 
     if (this.isChorus(this.currentGroup) && this.currentBeat === 0) {
-      const rgb = hexToRgb(this.color.vibrant)
-      const color = rgbToHex(rgb.r, rgb.g, rgb.b)
-      const darken = pSBC(-0.4, color)
-
+      const color = this.color.vibrant
+      const darken = shadeColor(color, -0.4)
       new TWEEN.Tween(new THREE.Color(color))
         .to(new THREE.Color(darken), 200)
         .easing(TWEEN.Easing.Quadratic.Out)
-        .onUpdate((color) => {
+        .onUpdate(color => {
           this.scene.background = color
         })
         .onComplete(() => {
           new TWEEN.Tween(new THREE.Color(darken))
             .to(new THREE.Color(color), 600)
             .easing(TWEEN.Easing.Quadratic.In)
-            .onUpdate( (color) => {
+            .onUpdate(color => {
               this.scene.background = color
             })
             .start()
@@ -360,7 +332,7 @@ export default class Circles {
         .start()
     }
   }
-  spawnLyric (lyric){
+  spawnLyric (lyric) {
     const message = lyric.text
     const shapes = this.font.generateShapes(message, 50)
 
@@ -398,7 +370,7 @@ export default class Circles {
   }
 
   groupLyrics () {
-    let group = new Group()
+    let group = new THREE.Group()
     for (let i = 0; i < this.lyricTexts.length; i++) {
       const it = this.lyricTexts[i]
 
@@ -430,7 +402,7 @@ export default class Circles {
 
       if (i > 0 && isNextSection) {
         this.lyricTextGroups.push(group)
-        group = new Group()
+        group = new THREE.Group()
         group.layoutType = 0
       }
       group.add(it)
@@ -450,11 +422,11 @@ export default class Circles {
         segments++
       }
 
-      let loudness_sum = 0
+      let loudnessSum = 0
       let startSegment = segments
       while (segments < this.analysis.segments.length && this.analysis.segments[segments].start < (i + 1 === this.lyricTextGroups.length ? Number.MAX_VALUE : this.lyricTextGroups[i + 1].firstChildren.lyric.timestamp)) {
         const loudness = this.analysis.segments[segments].loudness_max
-        loudness_sum += loudness
+        loudnessSum += loudness
         if (!this.analysis.track.loudness_max) this.analysis.track.loudness_max = -50
         if (!this.analysis.track.loudness_min) this.analysis.track.loudness_min = 50
 
@@ -463,7 +435,7 @@ export default class Circles {
         segments++
       }
 
-      group.avg_loudness = loudness_sum / (segments - startSegment)
+      group.avg_loudness = loudnessSum / (segments - startSegment)
 
       i++
     })
@@ -659,10 +631,10 @@ export default class Circles {
     )
     this.scene.add(circle)
 
-    animateVector3(circle.position, new Vector3(0, 0, CAMERA_INITIAL_Z * 1.5), {
+    animateVector3(circle.position, new THREE.Vector3(0, 0, CAMERA_INITIAL_Z * 1.5), {
       easing: TWEEN.Easing.Linear.None,
       duration: 1000,
-      update: (d) => {
+      update: d => {
         if (circle.position.z - this.camera.position.z > -10) {
           this.scene.background = new THREE.Color(this.isChorus() ? this.color.vibrant : '#ffffff')
           this.scene.remove(circle)
@@ -678,15 +650,15 @@ export default class Circles {
 
   animateIn (text) { // Pure Func
     text.isFadingIn = true
-    let toPos = new Vector3(text.position.x, text.position.y, text.position.z)
-    let toRot = new Vector3(text.rotation.x, text.rotation.y, text.rotation.z)
+    let toPos = new THREE.Vector3(text.position.x, text.position.y, text.position.z)
+    let toRot = new THREE.Vector3(text.rotation.x, text.rotation.y, text.rotation.z)
 
     // Store original location
-    text.originalPosition = new Vector3()
+    text.originalPosition = new THREE.Vector3()
     text.getWorldPosition(text.originalPosition)
 
     if (text.inOutAnim === 0) {
-      toRot = new Vector3(text.rotation.x + Math.PI / 16, text.rotation.y, text.rotation.z)
+      toRot = new THREE.Vector3(text.rotation.x + Math.PI / 16, text.rotation.y, text.rotation.z)
       text.position.set(text.position.x, text.position.y - 25, text.position.z)
       text.rotation.set(text.rotation.x - Math.PI / 6, text.rotation.y, text.rotation.z)
     } else if (text.inOutAnim === 1) {
@@ -716,11 +688,11 @@ export default class Circles {
     let toPos
     let toRot
     if (text.inOutAnim === 0) {
-      toPos = new Vector3(text.position.x, text.position.y + 25, text.position.z)
-      toRot = new Vector3(text.rotation.x - Math.PI / 6 - Math.PI / 16, text.rotation.y, text.rotation.z)
+      toPos = new THREE.Vector3(text.position.x, text.position.y + 25, text.position.z)
+      toRot = new THREE.Vector3(text.rotation.x - Math.PI / 6 - Math.PI / 16, text.rotation.y, text.rotation.z)
     } else if (text.inOutAnim === 1) {
-      toPos = new Vector3(text.position.x + 100, text.position.y, text.position.z)
-      toRot = new Vector3(text.rotation.x, text.rotation.y, text.rotation.z)
+      toPos = new THREE.Vector3(text.position.x + 100, text.position.y, text.position.z)
+      toRot = new THREE.Vector3(text.rotation.x, text.rotation.y, text.rotation.z)
     }
     animateVector3(text.position, toPos, {
       easing: DEFAULT_EASING_TYPE,
@@ -784,9 +756,9 @@ function getDefaultMaterial () {
 function animateVector3 (vectorToAnimate, target, options) {
   options = options || {}
   // get targets from options or set to defaults
-  const to = target || THREE.Vector3(),
-    easing = options.easing || TWEEN.Easing.Quadratic.In,
-    duration = options.duration || 2000
+  const to = target || THREE.Vector3()
+  const easing = options.easing || TWEEN.Easing.Quadratic.In
+  const duration = options.duration || 2000
   // create the tween
   const tweenVector3 = new TWEEN.Tween(vectorToAnimate)
     .to({ x: to.x, y: to.y, z: to.z }, duration)
@@ -807,10 +779,10 @@ function animateVector3 (vectorToAnimate, target, options) {
 
 function tween (obj, target, options) {
   options = options || {}
-  const easing = options.easing || TWEEN.Easing.Linear.None,
-    duration = options.duration || 2000,
-    variable = options.variable || 'opacity',
-    tweenTo = {}
+  const easing = options.easing || TWEEN.Easing.Linear.None
+  const duration = options.duration || 2000
+  const variable = options.variable || 'opacity'
+  const tweenTo = {}
   tweenTo[variable] = target // set the custom variable to the target
   const tween = new TWEEN.Tween(obj)
     .to(tweenTo, duration)
@@ -835,22 +807,4 @@ function isWhitespace (string) {
 
 function getRandomDouble (min, max) {
   return Math.random() * (max - min) + min
-}
-
-function hexToRgb (hex) {
-  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : null
-}
-
-function componentToHex (c) {
-  var hex = c.toString(16)
-  return hex.length === 1 ? '0' + hex : hex
-}
-
-function rgbToHex (r, g, b) {
-  return '#' + componentToHex(r) + componentToHex(g) + componentToHex(b)
 }
