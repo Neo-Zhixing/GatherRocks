@@ -15,7 +15,6 @@ export default {
   },
   mounted () {
     const visualizer = new Visualizer(this.$el)
-    visualizer.init(null)
     this.provider.target = visualizer
     this.provider.start()
   },

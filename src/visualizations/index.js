@@ -4,7 +4,16 @@ import * as TWEEN from '@tweenjs/tween.js'
 import Lyrics from 'lyrics.js'
 import * as Vibrant from 'node-vibrant'
 
-export let playtime = 0
+const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
+const DEFAULT_EASING_DURATION = 800
+const LYRIC_GROUP_THRESHOLD = 10
+const CAMERA_INITIAL_Z = 800
+const CAMERA_VERSE_FOV = 60
+const CAMERA_CHORUS_FOV = 95
+const IN_NEGATIVE_THRESHOLD = -0.2
+
+const totalChorusLayout = 1
+const totalVerseLayout = 2
 
 const pSBC = function (p, from, to) {
   if (typeof (p) !== 'number' || p < -1 || p > 1 || typeof (from) !== 'string' || (from[0] != 'r' && from[0] != '#') || (to && typeof (to) !== 'string')) return null // ErrorCheck
@@ -33,159 +42,75 @@ const pSBC = function (p, from, to) {
   }
 }
 
-export default function (element, canvas) {
-  let user
-  let cover
-  let name
+export default class Circles {
+  container = null
+  playtime = 0
+  startPlaytime = null
+  startPerformanceTime = null
 
-  let camera, scene, renderer, font
+  isLoaded = false
+  lyricTexts = []
+  lyricTextGroups = []
+  currentLyric = null
+  lookingAtLyric = null
+  currentGroup = null
+  currentBeat = 0
 
-  let startPlaytime
-  let startPerformanceTime
+  useLrcSections = false
 
-  let isTitleDisplayed = false
-  let titleGroup
-  let isLoaded = false
-  let lyricTexts = []
-  let lyricTextGroups = []
-  let currentLyric = null
-  let currentGroup = null
-  let currentBeat = 0
-  let lookingAtLyric = null
+  analysis = []
 
-  let data = []
+  lrc = null
 
-  let lrc
-
-  let useLrcSections = false
-  const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
-  const DEFAULT_EASING_DURATION = 800
-  const LYRIC_GROUP_THRESHOLD = 10
-  const CAMERA_INITIAL_Z = 800
-  const CAMERA_VERSE_FOV = 60
-  const CAMERA_CHORUS_FOV = 95
-  const IN_NEGATIVE_THRESHOLD = -0.2
-
-  let darkColor = '#871b42'
-  let primaryColor = '#000000'
-  let vibrantColor = '#871b42'
-
-  let useCanvas = false
-  let canvasTexture
-  let ctx
-
-  function getDefaultMaterial () {
-    return new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0,
-      side: THREE.FrontSide
-    })
+  color = {
+    dark: '#871b42',
+    primary: '#000000',
+    vibrant: '#871b42',
   }
 
-  function setupScene () {
-    camera = new THREE.PerspectiveCamera(CAMERA_VERSE_FOV, element.clientWidth / element.clientHeight, 0.01, 2000)
-    camera.position.set(0, 0, CAMERA_INITIAL_Z)
-    scene = new THREE.Scene()
-    scene.background = new THREE.Color(0xffffff)
+  useLrcSectionsConfidence = 0
 
-    renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setPixelRatio(1.5)
-    renderer.setSize(element.clientWidth, element.clientHeight)
+  currentChorusLayout = 0
+  currentVerselayout = totalChorusLayout + 1
 
-    element.appendChild(renderer.domElement)
-    window.addEventListener('resize', onWindowResize, false)
+  isLastChorus = false
 
-    if (useCanvas) {
-      ctx = canvas.getContext('2d')
-      canvasTexture = new THREE.CanvasTexture(canvas)
+  lastBeat = -1
 
-      const material = new THREE.MeshBasicMaterial({ map: canvasTexture })
+  completedTween = true
 
-      const geometry = new THREE.PlaneGeometry(600, 600)
-      const visualPlane = new THREE.Mesh(geometry, material)
-      visualPlane.position.set(0, 0, -2000)
+  constructor (element) {
+    this.container = element
 
-      scene.add(visualPlane)
-    }
+    this.camera = new THREE.PerspectiveCamera(CAMERA_VERSE_FOV, this.container.clientWidth / this.container.clientHeight, 0.01, 2000)
+    this.camera.position.set(0, 0, CAMERA_INITIAL_Z)
+    this.scene = new THREE.Scene()
+    this.scene.background = new THREE.Color(0xffffff)
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true })
+    this.renderer.setPixelRatio(1.5)
+    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight)
+
+    this.container.appendChild(this.renderer.domElement)
+    window.addEventListener('resize', this.onWindowResize, false)
 
     const loader = new THREE.FontLoader()
-    loader.load('/fonts/Neue.json', function (_font) {
-      font = _font
-      displayTitle()
+    loader.load('/fonts/Nunito.json', font => {
+      this.font = font
     })
-
-    animate()
+    this.animate()
   }
 
-  function displayTitle () {
-    if (!isTitleDisplayed) {
-      isTitleDisplayed = true
+  load (analysis, lyrics, time, cover){
+    this.isLoaded = false
+    this.cover = cover
 
-      if (isLoaded) return
-
-      titleGroup = new THREE.Group()
-
-      let message = 'Lyricly.'
-      let shapes = font.generateShapes(message, 50)
-      let geometry = new THREE.ShapeGeometry(shapes)
-      geometry.computeBoundingBox()
-      let text = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: true,
-        opacity: 1,
-        side: THREE.FrontSide
-      }))
-      text.position.z = 200
-      text.position.y = 30
-      text.material.depthTest = false
-
-      let xMid = -0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x)
-      geometry.translate(xMid, 0, 0)
-
-      titleGroup.add(text)
-
-      message = user == null ? 'Sign in to get started.' : 'Synchronizing...'
-      shapes = font.generateShapes(message, 10)
-      geometry = new THREE.ShapeGeometry(shapes)
-      geometry.computeBoundingBox()
-      text = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: true,
-        opacity: 1,
-        side: THREE.FrontSide
-      }))
-      text.position.z = 200
-      text.position.y = 0
-      text.material.depthTest = false
-      xMid = -0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x)
-      geometry.translate(xMid, 0, 0)
-
-      titleGroup.add(text)
-
-      titleGroup.position.y = -20
-      titleGroup.rotation.x = -Math.PI / 16
-
-      scene.add(titleGroup)
-    }
-  }
-
-  this.init = function (_user) {
-    user = _user
-    setupScene()
-  }
-
-  this.load = function (analysis, lyrics, time, _cover, _name) {
-    isLoaded = false
-    cover = _cover
-    name = _name
-
-    if (cover) {
-      Vibrant.from(cover).getPalette()
+    if (this.cover) {
+      Vibrant.from(this.cover).getPalette()
         .then((palette) => {
-          darkColor = palette.DarkMuted.getHex()
-          primaryColor = palette.DarkVibrant.getHex()
-          vibrantColor = palette.Vibrant.getHex()
+          this.color.dark = palette.DarkMuted.getHex()
+          this.color.primary = palette.DarkVibrant.getHex()
+          this.color.vibrant = palette.Vibrant.getHex()
         })
     }
 
@@ -193,18 +118,18 @@ export default function (element, canvas) {
       const t = window.performance.now()
 
       if (!time) time = 0
-      data = analysis
-      lrc = new Lyrics(lyrics)
+      this.analysis = analysis
+      this.lrc = new Lyrics(lyrics)
       const delay = (window.performance.now() - t) / 1000
 
-      startPlaytime = time / 1000 + delay - 0.5
-      startPerformanceTime = window.performance.now()
+      this.startPlaytime = time / 1000 + delay - 0.5
+      this.startPerformanceTime = window.performance.now()
     } else {
-      if (scene == null) return
+      if (this.scene == null) return
     }
 
-    if (scene != null) {
-      new TWEEN.Tween(camera.fov)
+    if (this.scene != null) {
+      new TWEEN.Tween(this.camera.fov)
         .to(CAMERA_VERSE_FOV, 800)
         .easing(TWEEN.Easing.Quadratic.InOut)
         .start()
@@ -221,7 +146,7 @@ export default function (element, canvas) {
         circle.rotation.y,
         circle.rotation.z
       )
-      scene.add(circle)
+      this.scene.add(circle)
 
       animateVector3(circle.position, new Vector3(0, 0, CAMERA_INITIAL_Z * 1.5), {
         easing: TWEEN.Easing.Linear.None,
@@ -231,88 +156,213 @@ export default function (element, canvas) {
         variable: 'opacity',
         easing: TWEEN.Easing.Linear.None,
         duration: 1000,
-        callback: function () {
-          scene.background = new THREE.Color(0xffffff)
-          scene.remove(circle)
+        callback: () => {
+          this.scene.background = new THREE.Color(0xffffff)
+          this.scene.remove(circle)
         }
       })
     }
 
-    if (scene != null || lyrics == null) {
+    if (this.scene != null || lyrics == null) {
       console.log('Resetting scene')
 
-      const reset = function () {
-        while (scene.children.length > 0) {
-          scene.remove(scene.children[0])
-        }
-        for (const text in lyricTextGroups) {
-          scene.remove(text)
-        }
-
-        lyricTexts = []
-        lyricTextGroups = []
-        currentLyric = null
-        currentGroup = null
-        lookingAtLyric = null
-        useLrcSections = false
-
-        useLrcSectionsConfidence = 0
-        currentBeat = 0
-        lastBeat = -1
-        completedTween = true
-        isLastChorus = false
-
-        if (lyrics != null) {
-          onLoaded()
-        } else {
-          if (font != null) {
-            displayTitle()
-          }
-        }
+      this.reset()
+      if (lyrics != null) {
+        this.onLoaded()
       }
+    }
+  }
+  reset () {
+    while (this.scene.children.length > 0) {
+      this.scene.remove(this.scene.children[0])
+    }
+    for (const text in this.lyricTextGroups) {
+      this.scene.remove(text)
+    }
 
-      if (titleGroup != null) {
-        titleGroup.children.forEach(child => {
-          animateVector3(child.position, new Vector3(child.position.x, child.position.y + 350, -1200), {
-            easing: TWEEN.Easing.Quadratic.Out,
-            duration: 500,
+    this.lyricTexts = []
+    this.lyricTextGroups = []
+    this.currentLyric = null
+    this.currentGroup = null
+    this.lookingAtLyric = null
+    this.useLrcSections = false
+
+    this.useLrcSectionsConfidence = 0
+    this.currentBeat = 0
+    this.lastBeat = -1
+    this.completedTween = true
+    this.isLastChorus = false
+  }
+  onWindowResize () {
+    this.camera.aspect = this.container.clientWidth / this.container.clientHeight
+    this.camera.updateProjectionMatrix()
+    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight)
+  }
+
+  render () {
+    this.renderer.render(this.scene, this.camera)
+    if (this.isLoaded) {
+      this.renderLyricTexts()
+
+      if (this.currentLyric != null && this.lookingAtLyric !== this.currentLyric) {
+        this.lookingAtLyric = this.currentLyric
+        const moveFrom = new THREE.Vector3().copy(this.camera.position)
+        const moveTo = new THREE.Vector3(0, 0, CAMERA_INITIAL_Z)
+        moveTo.x += getRandomDouble(-300, 300)
+        moveTo.y += getRandomDouble(0, -120)
+        moveTo.z += getRandomDouble(0, 160)
+
+        const rotateFrom = new THREE.Quaternion().copy(this.camera.quaternion)
+
+        const lookTo = new THREE.Vector3().copy(this.lookingAtLyric.originalPosition)
+
+        this.camera.position.set(moveTo.x, moveTo.y, moveTo.z)
+        this.camera.lookAt(lookTo)
+
+        const rotateTo = new THREE.Quaternion().copy(this.camera.quaternion)
+
+        this.camera.quaternion.set(rotateFrom._x, rotateFrom._y, rotateFrom._z, rotateFrom._w)
+        this.camera.position.set(moveFrom.x, moveFrom.y, moveFrom.z)
+
+        this.completedTween = false
+
+        new TWEEN.Tween(this.camera.quaternion)
+          .to(rotateTo, 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onComplete(() => {
+            this.completedTween = true
           })
-          tween(child.material, 0, {
-            variable: 'opacity',
-            easing: TWEEN.Easing.Quadratic.Out,
-            duration: 500,
-            callback: function () {
-              reset()
-            }
-          })
-        })
-        titleGroup = null
-      } else {
-        reset()
+          .start()
+
+        new TWEEN.Tween(this.camera.position)
+          .to(moveTo, 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .start()
+      }
+    }
+  }
+  animate (time) {
+    requestAnimationFrame(this.animate.bind(this))
+    TWEEN.update(time)
+
+    if (this.isLoaded) {
+      this.playtime = this.startPlaytime + (window.performance.now() - this.startPerformanceTime) / 1000.0
+      this.checkBeat()
+    }
+    this.render()
+  }
+  checkBeat () {
+    while (this.lastBeat + 1 < this.analysis.beats.length && this.playtime >= this.analysis.beats[this.lastBeat + 1].start) {
+      this.lastBeat++
+      this.analysis.beats[this.lastBeat].processed = true
+
+      if (this.playtime - this.analysis.beats[this.lastBeat].start < 1) {
+        this.analysis.beats[this.lastBeat].index = this.lastBeat
+        this.onBeat(this.analysis.beats[this.lastBeat])
       }
     }
   }
 
-  function onLoaded () {
-    lrc.getLyrics().forEach(it => spawnLyric(it))
-    groupLyrics()
+  isChorus (group) {
+    if (group == null) group = this.currentGroup
+    return group != null && group.avg_loudness > this.analysis.track.loudness
+  }
+  onLoaded () {
+    this.lrc.getLyrics().forEach(it => this.spawnLyric(it))
+    this.groupLyrics()
 
-    if (font !== null) {
-      isLoaded = true
+    if (this.font !== null) {
+      this.isLoaded = true
     } else {
-      setInterval(function () {
-        if (font !== null) {
-          isLoaded = true
+      setInterval( () => {
+        if (this.font !== null) {
+          this.isLoaded = true
         }
       }, 100)
     }
   }
+  spawnPulse () {
+    const tempoMultiplier = 100.0 / this.analysis.track.tempo * 3
+    const groupMultiplier = this.currentGroup != null ? ((this.currentGroup.avg_loudness - this.analysis.track.loudness_min) / (this.analysis.track.loudness_max - this.analysis.track.loudness_min)) : 1
 
-  let useLrcSectionsConfidence = 0
+    const material = new THREE.MeshBasicMaterial({
+      color: (this.currentBeat === 0 && this.isChorus(this.currentGroup)) ? this.color.dark : this.color.primary,
+      transparent: true,
+      opacity: 0,
+    })
 
-  function spawnLyric (lyric) {
+    const radius = ((this.isChorus() || this.currentBeat === 0) ? 400 : 200) * groupMultiplier
+    const segments = 64
+
+    const circleGeometry = new THREE.CircleGeometry(radius, segments)
+    const circle = new THREE.Mesh(circleGeometry, material)
+    circle.position.set(
+      this.isChorus() ? 0 : (this.currentBeat === 0 ? getRandomDouble(-900, 900) : getRandomDouble(-700, 700)),
+      this.isChorus() ? -80 : (this.currentBeat === 0 ? getRandomDouble(-600, 600) : getRandomDouble(-500, 500)),
+      this.isChorus() ? -300 : getRandomDouble(-600, -300)
+    )
+    circle.rotation.set(
+      circle.rotation.x,
+      circle.rotation.y,
+      circle.rotation.z
+    )
+    this.scene.add(circle)
+
+    animateVector3(circle.position, new Vector3(
+      this.isChorus() ? 0 : circle.position.x + (this.currentBeat === 0 ? getRandomDouble(-450, 450) : getRandomDouble(-400, 400)),
+      this.isChorus() ? 0 : circle.position.y + (this.currentBeat === 0 ? getRandomDouble(-300, 300) : getRandomDouble(-250, 250)),
+      circle.position.z + this.isChorus() ? 1000 : getRandomDouble(300, 600), {
+        easing: TWEEN.Easing.Linear.None,
+        duration: this.isChorus() ? 1000 : 2000 * tempoMultiplier,
+      }))
+
+    tween(circle.material, 0.2, {
+      variable: 'opacity',
+      easing: TWEEN.Easing.Linear.None,
+      duration: (this.isChorus() ? 200 : 400) * tempoMultiplier,
+      callback: () => {
+        tween(circle.material, 0, {
+          variable: 'opacity',
+          easing: TWEEN.Easing.Linear.None,
+          duration: (this.isChorus() ? 800 : 1600) * tempoMultiplier,
+          callback: () => {
+            this.scene.remove(circle)
+          }
+        })
+      }
+    })
+  }
+  onBeat (beat) {
+    this.currentBeat = beat.index % this.analysis.track.time_signature
+
+    this.spawnPulse()
+
+    if (this.isChorus(this.currentGroup) && this.currentBeat === 0) {
+      const rgb = hexToRgb(this.color.vibrant)
+      const color = rgbToHex(rgb.r, rgb.g, rgb.b)
+      const darken = pSBC(-0.4, color)
+
+      new TWEEN.Tween(new THREE.Color(color))
+        .to(new THREE.Color(darken), 200)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .onUpdate((color) => {
+          this.scene.background = color
+        })
+        .onComplete(() => {
+          new TWEEN.Tween(new THREE.Color(darken))
+            .to(new THREE.Color(color), 600)
+            .easing(TWEEN.Easing.Quadratic.In)
+            .onUpdate( (color) => {
+              this.scene.background = color
+            })
+            .start()
+        })
+        .start()
+    }
+  }
+  spawnLyric (lyric){
     const message = lyric.text
-    const shapes = font.generateShapes(message, 50)
+    const shapes = this.font.generateShapes(message, 50)
 
     let geometry = new THREE.ShapeGeometry(shapes)
     geometry.computeBoundingBox()
@@ -337,41 +387,41 @@ export default function (element, canvas) {
     text.onScreenThresHold = 6
 
     if (isWhitespace(lyric.text)) {
-      useLrcSectionsConfidence++
-      if (useLrcSectionsConfidence >= 2) {
+      this.useLrcSectionsConfidence++
+      if (this.useLrcSectionsConfidence >= 2) {
         // Let the .lrc does section division
-        useLrcSections = true
+        this.useLrcSections = true
       }
     }
 
-    lyricTexts.push(text)
+    this.lyricTexts.push(text)
   }
 
-  function groupLyrics () {
+  groupLyrics () {
     let group = new Group()
-    for (let i = 0; i < lyricTexts.length; i++) {
-      const it = lyricTexts[i]
+    for (let i = 0; i < this.lyricTexts.length; i++) {
+      const it = this.lyricTexts[i]
 
       let isNextSection = false
 
-      if (useLrcSections) {
+      if (this.useLrcSections) {
         if (isWhitespace(it.lyric.text)) {
           isNextSection = true
         }
       } else {
         if (!isNextSection) {
-          if (i > 0 && it.lyric.timestamp - lyricTexts[i - 1].lyric.timestamp > LYRIC_GROUP_THRESHOLD) {
+          if (i > 0 && it.lyric.timestamp - this.lyricTexts[i - 1].lyric.timestamp > LYRIC_GROUP_THRESHOLD) {
             isNextSection = true
           }
         }
 
         if (!isNextSection) {
           let lastSection = -1
-          while (lastSection + 1 < data.sections.length && it.lyric.timestamp >= data.sections[lastSection + 1].start) {
+          while (lastSection + 1 < this.analysis.sections.length && it.lyric.timestamp >= this.analysis.sections[lastSection + 1].start) {
             lastSection++
 
-            if (!data.sections[lastSection].processed) {
-              data.sections[lastSection].processed = true
+            if (!this.analysis.sections[lastSection].processed) {
+              this.analysis.sections[lastSection].processed = true
               isNextSection = true
             }
           }
@@ -379,37 +429,37 @@ export default function (element, canvas) {
       }
 
       if (i > 0 && isNextSection) {
-        lyricTextGroups.push(group)
+        this.lyricTextGroups.push(group)
         group = new Group()
         group.layoutType = 0
       }
       group.add(it)
       it.group = group
     }
-    lyricTextGroups.push(group)
+    this.lyricTextGroups.push(group)
 
-    lyricTextGroups.forEach(group => {
+    this.lyricTextGroups.forEach(group => {
       group.firstChildren = group.children[0]
       group.lastChildren = group.children[group.children.length - 1]
     })
 
     let i = 0
-    lyricTextGroups.forEach(group => {
+    this.lyricTextGroups.forEach(group => {
       let segments = 0
-      while (segments < data.segments.length && data.segments[segments].start < group.firstChildren.lyric.timestamp) {
+      while (segments < this.analysis.segments.length && this.analysis.segments[segments].start < group.firstChildren.lyric.timestamp) {
         segments++
       }
 
       let loudness_sum = 0
       let startSegment = segments
-      while (segments < data.segments.length && data.segments[segments].start < (i + 1 === lyricTextGroups.length ? Number.MAX_VALUE : lyricTextGroups[i + 1].firstChildren.lyric.timestamp)) {
-        const loudness = data.segments[segments].loudness_max
+      while (segments < this.analysis.segments.length && this.analysis.segments[segments].start < (i + 1 === this.lyricTextGroups.length ? Number.MAX_VALUE : this.lyricTextGroups[i + 1].firstChildren.lyric.timestamp)) {
+        const loudness = this.analysis.segments[segments].loudness_max
         loudness_sum += loudness
-        if (!data.track.loudness_max) data.track.loudness_max = -50
-        if (!data.track.loudness_min) data.track.loudness_min = 50
+        if (!this.analysis.track.loudness_max) this.analysis.track.loudness_max = -50
+        if (!this.analysis.track.loudness_min) this.analysis.track.loudness_min = 50
 
-        if (loudness > data.track.loudness_max) data.track.loudness_max = loudness
-        if (loudness < data.track.loudness_min) data.track.loudness_min = loudness
+        if (loudness > this.analysis.track.loudness_max) this.analysis.track.loudness_max = loudness
+        if (loudness < this.analysis.track.loudness_min) this.analysis.track.loudness_min = loudness
         segments++
       }
 
@@ -418,7 +468,7 @@ export default function (element, canvas) {
       i++
     })
 
-    lyricTextGroups.forEach(group => {
+    this.lyricTextGroups.forEach(group => {
       while (group.firstChildren && isWhitespace(group.firstChildren.lyric.text)) {
         group.remove(group.firstChildren)
         group.firstChildren.remove()
@@ -428,34 +478,28 @@ export default function (element, canvas) {
       }
     })
 
-    lyricTextGroups.forEach(group => {
+    this.lyricTextGroups.forEach(group => {
       if (group.children.length === 0) {
-        lyricTextGroups = lyricTextGroups.filter(it => it !== group)
+        this.lyricTextGroups = this.lyricTextGroups.filter(it => it !== group)
       }
     })
 
     i = 0
-    lyricTextGroups.forEach(group => {
+    this.lyricTextGroups.forEach(group => {
       console.log('Group #' + i++)
       group.children.forEach(it => console.log(it.lyric.text))
-      buildGroupLayout(group)
+      this.buildGroupLayout(group)
     })
   }
-
-  const totalChorusLayout = 1
-  const totalVerseLayout = 2
-  let currentChorusLayout = 0
-  let currentVerseLayout = totalChorusLayout + 1
-
-  function buildGroupLayout (group) {
-    if (isChorus(group)) {
-      group.layoutType = currentChorusLayout
-      currentChorusLayout++
-      if (currentChorusLayout === totalChorusLayout) currentChorusLayout = 0
+  buildGroupLayout (group) {
+    if (this.isChorus(group)) {
+      group.layoutType = this.currentChorusLayout
+      this.currentChorusLayout++
+      if (this.currentChorusLayout === totalChorusLayout) this.currentChorusLayout = 0
     } else {
-      group.layoutType = currentVerseLayout
-      currentVerseLayout++
-      if (currentVerseLayout === totalVerseLayout + totalChorusLayout) currentVerseLayout = totalChorusLayout
+      group.layoutType = this.currentVerselayout
+      this.currentVerselayout++
+      if (this.currentVerselayout === totalVerseLayout + totalChorusLayout) this.currentVerselayout = totalChorusLayout
     }
 
     group.children.forEach(text => {
@@ -518,45 +562,45 @@ export default function (element, canvas) {
       group.totalHeight = totalHeight
     }
 
-    scene.add(group)
+    this.scene.add(group)
   }
 
-  function renderLyricTexts () {
-    if (playtime === 0) return
+  renderLyricTexts () {
+    if (this.playtime === 0) return
 
-    for (let i = 0; i < lyricTexts.length; i++) {
-      const it = lyricTexts[i]
+    for (let i = 0; i < this.lyricTexts.length; i++) {
+      const it = this.lyricTexts[i]
       if (it.isKilled) continue
 
       // In/out
       if (!it.isSpawned && !it.isFadingIn) {
-        if (it.lyric.timestamp - playtime < it.inThreshold && it.lyric.timestamp - playtime > IN_NEGATIVE_THRESHOLD) {
+        if (it.lyric.timestamp - this.playtime < it.inThreshold && it.lyric.timestamp - this.playtime > IN_NEGATIVE_THRESHOLD) {
           it.isSpawned = true
           it.visible = true
 
-          currentLyric = it
-          if (currentGroup !== it.group) {
-            currentGroup = it.group
-            onGroup()
+          this.currentLyric = it
+          if (this.currentGroup !== it.group) {
+            this.currentGroup = it.group
+            this.onGroup()
           }
 
-          animateIn(it)
+          this.animateIn(it)
         }
       } else if (it.isSpawned && !it.isFadingOut) {
-        if (lyricTexts[Math.min(i + 1, lyricTexts.length - 1)].lyric.timestamp - playtime < it.outThreshold ||
-          playtime - it.lyric.timestamp > it.onScreenThresHold) {
-          animateOut(it)
+        if (this.lyricTexts[Math.min(i + 1, this.lyricTexts.length - 1)].lyric.timestamp - this.playtime < it.outThreshold ||
+          this.playtime - it.lyric.timestamp > it.onScreenThresHold) {
+          this.animateOut(it)
         }
       }
 
       // On screen
       if (it.isSpawned && !it.isKilled && !it.isFadingIn && !it.isFadingOut) {
-        animateOnScreen(it)
+        this.animateOnScreen(it)
       }
     }
 
-    for (let i = 0; i < lyricTextGroups.length; i++) {
-      const group = lyricTextGroups[i]
+    for (let i = 0; i < this.lyricTextGroups.length; i++) {
+      const group = this.lyricTextGroups[i]
 
       if (group.lastChildren.isKilled) continue
       let anySpawn = false
@@ -567,46 +611,43 @@ export default function (element, canvas) {
       })
       if (!anySpawn) continue
 
-      animateGroup(group)
+      this.animateGroup(group)
     }
   }
+  onGroup () {
+    if (this.isLastChorus && this.isChorus()) return
+    if (!this.isLastChorus && !this.isChorus()) return
 
-  let isLastChorus = false
+    this.isLastChorus = this.isChorus()
 
-  function onGroup () {
-    if (isLastChorus && isChorus()) return
-    if (!isLastChorus && !isChorus()) return
-
-    isLastChorus = isChorus()
-
-    const rotateFrom = new THREE.Quaternion().copy(camera.quaternion)
+    const rotateFrom = new THREE.Quaternion().copy(this.camera.quaternion)
 
     const lookTo = new THREE.Vector3()
 
-    camera.lookAt(lookTo)
+    this.camera.lookAt(lookTo)
 
-    const rotateTo = new THREE.Quaternion().copy(camera.quaternion)
+    const rotateTo = new THREE.Quaternion().copy(this.camera.quaternion)
 
-    camera.quaternion.set(rotateFrom._x, rotateFrom._y, rotateFrom._z, rotateFrom._w)
+    this.camera.quaternion.set(rotateFrom._x, rotateFrom._y, rotateFrom._z, rotateFrom._w)
 
-    new TWEEN.Tween(camera.quaternion)
+    new TWEEN.Tween(this.camera.quaternion)
       .to(rotateTo, 1000)
       .easing(TWEEN.Easing.Quadratic.InOut)
       .start()
 
-    new TWEEN.Tween(camera.position)
+    new TWEEN.Tween(this.camera.position)
       .to(moveTo, 1000)
       .easing(TWEEN.Easing.Quadratic.InOut)
       .start()
 
-    new TWEEN.Tween(camera.fov)
-      .to(isChorus() ? CAMERA_CHORUS_FOV : CAMERA_VERSE_FOV, 800)
+    new TWEEN.Tween(this.camera.fov)
+      .to(this.isChorus() ? CAMERA_CHORUS_FOV : CAMERA_VERSE_FOV, 800)
       .easing(TWEEN.Easing.Quadratic.InOut)
       .start()
 
     const circleGeometry = new THREE.CircleGeometry(300, 64)
     const circle = new THREE.Mesh(circleGeometry, new THREE.MeshBasicMaterial({
-      color: isChorus() ? darkColor : '#ffffff',
+      color: this.isChorus() ? this.color.dark : '#ffffff',
       transparent: true,
       opacity: 0
     }))
@@ -616,15 +657,15 @@ export default function (element, canvas) {
       circle.rotation.y,
       circle.rotation.z
     )
-    scene.add(circle)
+    this.scene.add(circle)
 
     animateVector3(circle.position, new Vector3(0, 0, CAMERA_INITIAL_Z * 1.5), {
       easing: TWEEN.Easing.Linear.None,
       duration: 1000,
-      update: function (d) {
-        if (circle.position.z - camera.position.z > -10) {
-          scene.background = new THREE.Color(isChorus() ? vibrantColor : '#ffffff')
-          scene.remove(circle)
+      update: (d) => {
+        if (circle.position.z - this.camera.position.z > -10) {
+          this.scene.background = new THREE.Color(this.isChorus() ? this.color.vibrant : '#ffffff')
+          this.scene.remove(circle)
         }
       }
     })
@@ -635,36 +676,7 @@ export default function (element, canvas) {
     })
   }
 
-  function onBeat (beat) {
-    currentBeat = beat.index % data.track.time_signature
-
-    spawnPulse()
-
-    if (isChorus(currentGroup) && currentBeat === 0) {
-      const rgb = hexToRgb(vibrantColor)
-      const color = rgbToHex(rgb.r, rgb.g, rgb.b)
-      const darken = pSBC(-0.4, color)
-
-      new TWEEN.Tween(new THREE.Color(color))
-        .to(new THREE.Color(darken), 200)
-        .easing(TWEEN.Easing.Quadratic.Out)
-        .onUpdate(function (color) {
-          scene.background = color
-        })
-        .onComplete(() => {
-          new TWEEN.Tween(new THREE.Color(darken))
-            .to(new THREE.Color(color), 600)
-            .easing(TWEEN.Easing.Quadratic.In)
-            .onUpdate(function (color) {
-              scene.background = color
-            })
-            .start()
-        })
-        .start()
-    }
-  }
-
-  function animateIn (text) {
+  animateIn (text) { // Pure Func
     text.isFadingIn = true
     let toPos = new Vector3(text.position.x, text.position.y, text.position.z)
     let toRot = new Vector3(text.rotation.x, text.rotation.y, text.rotation.z)
@@ -699,7 +711,7 @@ export default function (element, canvas) {
     })
   }
 
-  function animateOut (text) {
+  animateOut (text) { // Not pure func
     text.isFadingOut = true
     let toPos
     let toRot
@@ -723,20 +735,20 @@ export default function (element, canvas) {
       variable: 'opacity',
       easing: DEFAULT_EASING_TYPE,
       duration: DEFAULT_EASING_DURATION,
-      update: function () {
+      update: () => {
         if (!text.isKilled && text.position.distanceTo(toPos) < 2) {
           text.isFadingOut = false
           text.isKilled = true
           text.visible = false
           text.position.set(0, 0, 1000)
 
-          scene.remove(text)
+          this.scene.remove(text)
         }
       },
     })
   }
 
-  function animateOnScreen (text) {
+  animateOnScreen (text) { // Pure Func
     if (text.onScreenAnim === 0) {
 
     } else if (text.onScreenAnim === 1) {
@@ -747,230 +759,98 @@ export default function (element, canvas) {
     }
   }
 
-  function animateGroup (group) {
+  animateGroup (group) { // Pure Func
     if (group.layoutType === 0) {
     } else if (group.layoutType === 1) {
     } else if (group.layoutType === 2) {
       group.position.set(
         group.position.x,
-        (playtime - group.firstChildren.lyric.timestamp) / (group.lastChildren.lyric.timestamp - group.firstChildren.lyric.timestamp) * group.totalHeight - 150,
+        (this.playtime - group.firstChildren.lyric.timestamp) / (group.lastChildren.lyric.timestamp - group.firstChildren.lyric.timestamp) * group.totalHeight - 150,
         group.position.z
       )
     }
   }
+}
 
-  function spawnPulse () {
-    const tempoMultiplier = 100.0 / data.track.tempo * 3
-    const groupMultiplier = currentGroup != null ? ((currentGroup.avg_loudness - data.track.loudness_min) / (data.track.loudness_max - data.track.loudness_min)) : 1
+function getDefaultMaterial () {
+  return new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0,
+    side: THREE.FrontSide
+  })
+}
 
-    const material = new THREE.MeshBasicMaterial({
-      color: (currentBeat === 0 && isChorus(currentGroup)) ? darkColor : primaryColor,
-      transparent: true,
-      opacity: 0,
-    })
-
-    const radius = ((isChorus() || currentBeat === 0) ? 400 : 200) * groupMultiplier
-    const segments = 64
-
-    const circleGeometry = new THREE.CircleGeometry(radius, segments)
-    const circle = new THREE.Mesh(circleGeometry, material)
-    circle.position.set(
-      isChorus() ? 0 : (currentBeat === 0 ? getRandomDouble(-900, 900) : getRandomDouble(-700, 700)),
-      isChorus() ? -80 : (currentBeat === 0 ? getRandomDouble(-600, 600) : getRandomDouble(-500, 500)),
-      isChorus() ? -300 : getRandomDouble(-600, -300)
-    )
-    circle.rotation.set(
-      circle.rotation.x,
-      circle.rotation.y,
-      circle.rotation.z
-    )
-    scene.add(circle)
-
-    animateVector3(circle.position, new Vector3(
-      isChorus() ? 0 : circle.position.x + (currentBeat === 0 ? getRandomDouble(-450, 450) : getRandomDouble(-400, 400)),
-      isChorus() ? 0 : circle.position.y + (currentBeat === 0 ? getRandomDouble(-300, 300) : getRandomDouble(-250, 250)),
-      circle.position.z + isChorus() ? 1000 : getRandomDouble(300, 600), {
-        easing: TWEEN.Easing.Linear.None,
-        duration: isChorus() ? 1000 : 2000 * tempoMultiplier,
-      }))
-
-    tween(circle.material, 0.2, {
-      variable: 'opacity',
-      easing: TWEEN.Easing.Linear.None,
-      duration: (isChorus() ? 200 : 400) * tempoMultiplier,
-      callback: function () {
-        tween(circle.material, 0, {
-          variable: 'opacity',
-          easing: TWEEN.Easing.Linear.None,
-          duration: (isChorus() ? 800 : 1600) * tempoMultiplier,
-          callback: function () {
-            scene.remove(circle)
-          }
-        })
+function animateVector3 (vectorToAnimate, target, options) {
+  options = options || {}
+  // get targets from options or set to defaults
+  const to = target || THREE.Vector3(),
+    easing = options.easing || TWEEN.Easing.Quadratic.In,
+    duration = options.duration || 2000
+  // create the tween
+  const tweenVector3 = new TWEEN.Tween(vectorToAnimate)
+    .to({ x: to.x, y: to.y, z: to.z }, duration)
+    .easing(easing)
+    .onUpdate(function (d) {
+      if (options.update) {
+        options.update(d)
       }
     })
-  }
+    .onComplete(function (d) {
+      if (options.callback) options.callback(d)
+    })
+  // start the tween
+  tweenVector3.start()
+  // return the tween in case we want to manipulate it later on
+  return tweenVector3
+}
 
-  let lastBeat = -1
-
-  function checkBeat () {
-    while (lastBeat + 1 < data.beats.length && playtime >= data.beats[lastBeat + 1].start) {
-      lastBeat++
-      data.beats[lastBeat].processed = true
-
-      if (playtime - data.beats[lastBeat].start < 1) {
-        data.beats[lastBeat].index = lastBeat
-        onBeat(data.beats[lastBeat])
+function tween (obj, target, options) {
+  options = options || {}
+  const easing = options.easing || TWEEN.Easing.Linear.None,
+    duration = options.duration || 2000,
+    variable = options.variable || 'opacity',
+    tweenTo = {}
+  tweenTo[variable] = target // set the custom variable to the target
+  const tween = new TWEEN.Tween(obj)
+    .to(tweenTo, duration)
+    .easing(easing)
+    .onUpdate(function (d) {
+      if (options.update) {
+        options.update(d)
       }
-    }
-  }
-
-  function isChorus (group) {
-    if (group == null) group = currentGroup
-    return group != null && group.avg_loudness > data.track.loudness
-  }
-
-  function onWindowResize () {
-    camera.aspect = element.clientWidth / element.clientHeight
-    camera.updateProjectionMatrix()
-    renderer.setSize(element.clientWidth, element.clientHeight)
-  }
-
-  function animate (time) {
-    requestAnimationFrame(animate)
-    TWEEN.update(time)
-
-    if (isLoaded) {
-      playtime = startPlaytime + (window.performance.now() - startPerformanceTime) / 1000.0
-      checkBeat()
-    }
-    render()
-  }
-
-  let completedTween = true
-
-  function render () {
-    renderer.render(scene, camera)
-    if (isLoaded) {
-      renderLyricTexts()
-
-      if (currentLyric != null && lookingAtLyric !== currentLyric) {
-        lookingAtLyric = currentLyric
-        const moveFrom = new THREE.Vector3().copy(camera.position)
-        const moveTo = new THREE.Vector3(0, 0, CAMERA_INITIAL_Z)
-        moveTo.x += getRandomDouble(-300, 300)
-        moveTo.y += getRandomDouble(0, -120)
-        moveTo.z += getRandomDouble(0, 160)
-
-        const rotateFrom = new THREE.Quaternion().copy(camera.quaternion)
-
-        const lookTo = new THREE.Vector3().copy(lookingAtLyric.originalPosition)
-
-        camera.position.set(moveTo.x, moveTo.y, moveTo.z)
-        camera.lookAt(lookTo)
-
-        const rotateTo = new THREE.Quaternion().copy(camera.quaternion)
-
-        camera.quaternion.set(rotateFrom._x, rotateFrom._y, rotateFrom._z, rotateFrom._w)
-        camera.position.set(moveFrom.x, moveFrom.y, moveFrom.z)
-
-        completedTween = false
-
-        new TWEEN.Tween(camera.quaternion)
-          .to(rotateTo, 1000)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .onComplete(() => {
-            completedTween = true
-          })
-          .start()
-
-        new TWEEN.Tween(camera.position)
-          .to(moveTo, 1000)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .start()
-      } else if (completedTween && lookingAtLyric != null) {
-
+    })
+    .onComplete(function (d) {
+      if (options.callback) {
+        options.callback(d)
       }
+    })
+  tween.start()
+  return tween
+}
 
-      if (useCanvas) {
-        ctx.fillStyle = 'white'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        canvasTexture.needsUpdate = true
-      }
-    }
-  }
+function isWhitespace (string) {
+  return !string.replace(/\s/g, '').length
+}
 
-  function animateVector3 (vectorToAnimate, target, options) {
-    options = options || {}
-    // get targets from options or set to defaults
-    const to = target || THREE.Vector3(),
-      easing = options.easing || TWEEN.Easing.Quadratic.In,
-      duration = options.duration || 2000
-    // create the tween
-    const tweenVector3 = new TWEEN.Tween(vectorToAnimate)
-      .to({ x: to.x, y: to.y, z: to.z }, duration)
-      .easing(easing)
-      .onUpdate(function (d) {
-        if (options.update) {
-          options.update(d)
-        }
-      })
-      .onComplete(function (d) {
-        if (options.callback) options.callback(d)
-      })
-    // start the tween
-    tweenVector3.start()
-    // return the tween in case we want to manipulate it later on
-    return tweenVector3
-  }
+function getRandomDouble (min, max) {
+  return Math.random() * (max - min) + min
+}
 
-  function tween (obj, target, options) {
-    options = options || {}
-    const easing = options.easing || TWEEN.Easing.Linear.None,
-      duration = options.duration || 2000,
-      variable = options.variable || 'opacity',
-      tweenTo = {}
-    tweenTo[variable] = target // set the custom variable to the target
-    const tween = new TWEEN.Tween(obj)
-      .to(tweenTo, duration)
-      .easing(easing)
-      .onUpdate(function (d) {
-        if (options.update) {
-          options.update(d)
-        }
-      })
-      .onComplete(function (d) {
-        if (options.callback) {
-          options.callback(d)
-        }
-      })
-    tween.start()
-    return tween
-  }
+function hexToRgb (hex) {
+  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null
+}
 
-  function isWhitespace (string) {
-    return !string.replace(/\s/g, '').length
-  }
+function componentToHex (c) {
+  var hex = c.toString(16)
+  return hex.length === 1 ? '0' + hex : hex
+}
 
-  function getRandomDouble (min, max) {
-    return Math.random() * (max - min) + min
-  }
-
-  function hexToRgb (hex) {
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : null
-  }
-
-  function componentToHex (c) {
-    var hex = c.toString(16)
-    return hex.length === 1 ? '0' + hex : hex
-  }
-
-  function rgbToHex (r, g, b) {
-    return '#' + componentToHex(r) + componentToHex(g) + componentToHex(b)
-  }
+function rgbToHex (r, g, b) {
+  return '#' + componentToHex(r) + componentToHex(g) + componentToHex(b)
 }
