@@ -39,6 +39,8 @@ class SpotifyPullProvider {
     }
     const track = playback.item
     if (this.track && (this.track.id === track.id)) {
+      // Playing the same song
+      this.target.seek(playback.progress_ms)
       return
     }
     this.track = track

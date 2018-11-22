@@ -221,6 +221,10 @@ export default class Circles {
     }
     this.render()
   }
+  seek (time) {
+    this.startPlaytime = time / 1000
+    this.startPerformanceTime = window.performance.now()
+  }
   checkBeat () {
     while (this.lastBeat + 1 < this.analysis.beats.length && this.playtime >= this.analysis.beats[this.lastBeat + 1].start) {
       this.lastBeat++
