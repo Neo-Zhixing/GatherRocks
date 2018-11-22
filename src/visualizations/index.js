@@ -32,7 +32,7 @@ export default class Circles {
 
   useLrcSections = false
 
-  analysis = []
+  analysis = null
 
   lrc = null
 
@@ -150,10 +150,6 @@ export default class Circles {
     while (this.scene.children.length > 0) {
       this.scene.remove(this.scene.children[0])
     }
-    for (const text in this.lyricTextGroups) {
-      this.scene.remove(text)
-    }
-
     this.lyricTexts = []
     this.lyricTextGroups = []
     this.currentLyric = null
@@ -242,7 +238,7 @@ export default class Circles {
     return group != null && group.avg_loudness > this.analysis.track.loudness
   }
   onLoaded () {
-    this.lrc.getLyrics().forEach(it => this.spawnLyric(it))
+    this.lrc.getLyrics().forEach(this.spawnLyric.bind(this))
     this.groupLyrics()
 
     if (this.font !== null) {
@@ -256,6 +252,7 @@ export default class Circles {
     }
   }
   spawnPulse () {
+    const chorus = this.isChorus()
     const tempoMultiplier = 100.0 / this.analysis.track.tempo * 3
     const groupMultiplier = this.currentGroup != null ? ((this.currentGroup.avg_loudness - this.analysis.track.loudness_min) / (this.analysis.track.loudness_max - this.analysis.track.loudness_min)) : 1
 
@@ -270,35 +267,39 @@ export default class Circles {
 
     const circleGeometry = new THREE.CircleGeometry(radius, segments)
     const circle = new THREE.Mesh(circleGeometry, material)
-    circle.position.set(
-      this.isChorus() ? 0 : (this.currentBeat === 0 ? getRandomDouble(-900, 900) : getRandomDouble(-700, 700)),
-      this.isChorus() ? -80 : (this.currentBeat === 0 ? getRandomDouble(-600, 600) : getRandomDouble(-500, 500)),
-      this.isChorus() ? -300 : getRandomDouble(-600, -300)
-    )
-    circle.rotation.set(
-      circle.rotation.x,
-      circle.rotation.y,
-      circle.rotation.z
-    )
+    if (chorus) {
+      circle.position.set(0, -80, -300)
+    } else {
+      circle.position.set(
+        this.currentBeat === 0 ? getRandomDouble(-900, 900) : getRandomDouble(-700, 700),
+        this.currentBeat === 0 ? getRandomDouble(-600, 600) : getRandomDouble(-500, 500),
+        getRandomDouble(-600, -300)
+      )
+    }
     this.scene.add(circle)
 
-    animateVector3(circle.position, new THREE.Vector3(
-      this.isChorus() ? 0 : circle.position.x + (this.currentBeat === 0 ? getRandomDouble(-450, 450) : getRandomDouble(-400, 400)),
-      this.isChorus() ? 0 : circle.position.y + (this.currentBeat === 0 ? getRandomDouble(-300, 300) : getRandomDouble(-250, 250)),
-      circle.position.z + this.isChorus() ? 1000 : getRandomDouble(300, 600), {
-        easing: TWEEN.Easing.Linear.None,
-        duration: this.isChorus() ? 1000 : 2000 * tempoMultiplier,
-      }))
+    // Move the circle
+    animateVector3(
+      circle.position,
+      chorus
+        ? new THREE.Vector3(0, 0, 1000)
+        : new THREE.Vector3(
+          circle.position.x + (this.currentBeat === 0 ? getRandomDouble(-450, 450) : getRandomDouble(-400, 400)),
+          circle.position.y + (this.currentBeat === 0 ? getRandomDouble(-300, 300) : getRandomDouble(-250, 250)),
+          1000
+        )
+    )
 
+    // Display / Hide / Remove the Circle
     tween(circle.material, 0.2, {
       variable: 'opacity',
       easing: TWEEN.Easing.Linear.None,
-      duration: (this.isChorus() ? 200 : 400) * tempoMultiplier,
+      duration: (chorus ? 200 : 400) * tempoMultiplier,
       callback: () => {
         tween(circle.material, 0, {
           variable: 'opacity',
           easing: TWEEN.Easing.Linear.None,
-          duration: (this.isChorus() ? 800 : 1600) * tempoMultiplier,
+          duration: (chorus ? 800 : 1600) * tempoMultiplier,
           callback: () => {
             this.scene.remove(circle)
           }
@@ -333,8 +334,7 @@ export default class Circles {
     }
   }
   spawnLyric (lyric) {
-    const message = lyric.text
-    const shapes = this.font.generateShapes(message, 50)
+    const shapes = this.font.generateShapes(lyric.text, 50)
 
     let geometry = new THREE.ShapeGeometry(shapes)
     geometry.computeBoundingBox()
@@ -570,7 +570,6 @@ export default class Circles {
         this.animateOnScreen(it)
       }
     }
-
     for (let i = 0; i < this.lyricTextGroups.length; i++) {
       const group = this.lyricTextGroups[i]
 
