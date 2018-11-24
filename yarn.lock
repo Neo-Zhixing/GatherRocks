@@ -1681,13 +1681,6 @@ babel-loader@^8.0.4:
     mkdirp "^0.5.1"
     util.promisify "^1.0.0"
 
-babel-plugin-add-module-exports@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/babel-plugin-add-module-exports/-/babel-plugin-add-module-exports-1.0.0.tgz#72b5424d941a336c6a35357f373d8b8366263031"
-  integrity sha512-m0sMxPL4FaN2K69GQgaRJa4Ny15qKSdoknIcpN+gz+NaJlAW9pge/povs13tPYsKDboflrEQC+/3kfIsONBTaw==
-  optionalDependencies:
-    chokidar "^2.0.4"
-
 babel-plugin-dynamic-import-node@^2.2.0:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/babel-plugin-dynamic-import-node/-/babel-plugin-dynamic-import-node-2.2.0.tgz#c0adfb07d95f4a4495e9aaac6ec386c4d7c2524e"
@@ -2180,7 +2173,7 @@ check-types@^7.3.0:
   resolved "https://registry.yarnpkg.com/check-types/-/check-types-7.4.0.tgz#0378ec1b9616ec71f774931a3c6516fad8c152f4"
   integrity sha512-YbulWHdfP99UfZ73NcUDlNJhEIDgm9Doq9GhpyXbF+7Aegi3CVV7qqMCKTTqJxlvEvnQBp9IA+dxsGN6xK/nSg==
 
-chokidar@^2.0.0, chokidar@^2.0.2, chokidar@^2.0.4:
+chokidar@^2.0.0, chokidar@^2.0.2:
   version "2.0.4"
   resolved "https://registry.yarnpkg.com/chokidar/-/chokidar-2.0.4.tgz#356ff4e2b0e8e43e322d18a372460bbcf3accd26"
   integrity sha512-z9n7yt9rOvIJrMhvDtDictKrkFHeihkNl6uWMmZlmL6tJtX9Cs+87oK+teBx+JIgzvbX3yZHT3eF8vpbDxHJXQ==
@@ -5335,11 +5328,6 @@ lru-cache@^4.0.1, lru-cache@^4.1.1, lru-cache@^4.1.2, lru-cache@^4.1.3:
   dependencies:
     pseudomap "^1.0.2"
     yallist "^2.1.2"
-
-lyrics.js@^0.4.1:
-  version "0.4.1"
-  resolved "https://registry.yarnpkg.com/lyrics.js/-/lyrics.js-0.4.1.tgz#ece2a516df1b5b8fbbb1db98b6e323ef737cf1f7"
-  integrity sha512-76BceEaONQ0b0bo1YRBp4cdleN7WTXy9nUWHe6xs+o2NYTKrXQxhHFdLO3AnZUzURMO96FCTv43714GTN2tuiQ==
 
 make-dir@^1.0.0:
   version "1.3.0"
@@ -8496,11 +8484,9 @@ webpack-bundle-analyzer@^3.0.3:
     opener "^1.5.1"
     ws "^6.0.0"
 
-"webpack-cdn-plugin@https://github.com/Neo-Zhixing/webpack-cdn-plugin":
+"webpack-cdn-plugin@https://github.com/Neo-Zhixing/webpack-cdn-plugin#develop":
   version "2.3.3"
-  resolved "https://github.com/Neo-Zhixing/webpack-cdn-plugin#4e57dd751ac9c0cc28e324b63dfdbfcfd7549987"
-  dependencies:
-    babel-plugin-add-module-exports "^1.0.0"
+  resolved "https://github.com/Neo-Zhixing/webpack-cdn-plugin#20366dd8dc86911476e4bf7a85e499cb58d7cf7c"
 
 webpack-chain@^4.11.0:
   version "4.12.1"

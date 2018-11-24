@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import * as TWEEN from '@tweenjs/tween.js'
-import Lyrics from 'lyrics.js'
+import Lyrics from './utils/lyrics'
 import * as Vibrant from 'node-vibrant'
 
-import { shadeColor } from './utils'
+import { shadeColor } from './utils/color'
 
 const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
 const DEFAULT_EASING_DURATION = 800
