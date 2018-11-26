@@ -6,13 +6,13 @@ export default class CircleVisualizer extends Visualizer {
   constructor (element, ...args) {
     super(element, ...args)
     const params = {
-      fullscreen: true,
+      fullscreen: false,
+      width: 300,
+      height: 300,
       type: Two.Types.webgl,
-      autostart: true,
     }
     this.renderer = new Two(params)
       .appendTo(element)
-
     const circle = this.renderer.makeCircle(72, 100, 50)
     const rect = this.renderer.makeRectangle(213, 100, 100, 100)
 
@@ -22,20 +22,25 @@ export default class CircleVisualizer extends Visualizer {
 
     rect.fill = 'rgb(0, 200, 255)'
     rect.opacity = 0.75
-
-    new TWEEN.Tween(circle.linewidth)
-      .to(1000, 1000)
-      .easing(TWEEN.Easing.Linear.None)
-      .start()
     rect.noStroke()
-
-    function animate(time) {
-      requestAnimationFrame(animate)
-      TWEEN.update(time)
+  }
+  loaded = false
+  load () {
+    super.load(...arguments)
+    if (!this.loaded) {
+      this.loaded = true
+      requestAnimationFrame(this.update.bind(this))
     }
-    requestAnimationFrame(animate)
   }
   update (time) {
+    requestAnimationFrame(this.update.bind(this))
     TWEEN.update(time)
+    this.renderer.update()
+
+    const playtime = (time - this.startTime) / 1000
+    const onBeat = this.analysis.check('beats', playtime)
+    if (onBeat) {
+      console.log('beat', playtime)
+    }
   }
 }
