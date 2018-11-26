@@ -4,6 +4,7 @@ import Lyrics from './utils/lyrics'
 import * as Vibrant from 'node-vibrant'
 
 import { shadeColor } from './utils/color'
+import { getRandomDouble } from './utils/geometry'
 
 const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
 const DEFAULT_EASING_DURATION = 800
@@ -786,12 +787,12 @@ function tween (obj, target, options) {
   const tween = new TWEEN.Tween(obj)
     .to(tweenTo, duration)
     .easing(easing)
-    .onUpdate(function (d) {
+    .onUpdate(d => {
       if (options.update) {
         options.update(d)
       }
     })
-    .onComplete(function (d) {
+    .onComplete(d => {
       if (options.callback) {
         options.callback(d)
       }
@@ -802,8 +803,4 @@ function tween (obj, target, options) {
 
 function isWhitespace (string) {
   return !string.replace(/\s/g, '').length
-}
-
-function getRandomDouble (min, max) {
-  return Math.random() * (max - min) + min
 }

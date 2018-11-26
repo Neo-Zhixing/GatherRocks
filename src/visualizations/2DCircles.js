@@ -2,33 +2,29 @@ import Two from 'two.js'
 import * as TWEEN from '@tweenjs/tween.js'
 import Visualizer from '.'
 
+import { getRandomPoint } from './utils/geometry'
+import { Color } from './utils/color'
+
 export default class CircleVisualizer extends Visualizer {
   constructor (element, ...args) {
     super(element, ...args)
     const params = {
       fullscreen: false,
-      width: 300,
-      height: 300,
-      type: Two.Types.webgl,
+      width: element.clientWidth,
+      height: element.clientHeight,
+      type: Two.Types.canvas,
     }
     this.renderer = new Two(params)
       .appendTo(element)
-    const circle = this.renderer.makeCircle(72, 100, 50)
-    const rect = this.renderer.makeRectangle(213, 100, 100, 100)
 
-    circle.fill = '#FF8000'
-    circle.stroke = 'orangered'
-    circle.linewidth = 5
-
-    rect.fill = 'rgb(0, 200, 255)'
-    rect.opacity = 0.75
-    rect.noStroke()
+    this.background = '#FFFFFF'
   }
   loaded = false
   load () {
     super.load(...arguments)
     if (!this.loaded) {
       this.loaded = true
+      this.onLoad()
       requestAnimationFrame(this.update.bind(this))
     }
   }
@@ -38,9 +34,70 @@ export default class CircleVisualizer extends Visualizer {
     this.renderer.update()
 
     const playtime = (time - this.startTime) / 1000
-    const onBeat = this.analysis.check('beats', playtime)
-    if (onBeat) {
-      console.log('beat', playtime)
+
+    let val = this.analysis.check('sections', playtime)
+    if (val) this.onSection(val)
+    val = this.analysis.check('bars', playtime)
+    if (val) this.onBar(val)
+    val = this.analysis.check('beats', playtime)
+    if (val) this.onBeat(val)
+  }
+
+  sectionCircle = null
+  onSection (section) {
+    const point = getRandomPoint(this.container.clientWidth, this.container.clientHeight)
+    let duration = section.duration * 1000
+    if (duration < 2000) duration /= 2
+    else {
+      duration = 1000 + (section.loudness * 30)
+      if (duration < 100) duration = 100
     }
+    const color = Color.random(section)
+
+    this.sectionCircle.fill = color.toRGBFunc()
+    this.sectionCircle.translation.set(point.x, point.y)
+    new TWEEN.Tween(this.sectionCircle)
+      .to({ radius: 1000 }, 2000)
+      .easing(TWEEN.Easing.Linear.None)
+      .onComplete(() => {
+        this.sectionCircle.radius = 0
+        this.background = color.toRGBFunc()
+      })
+      .start()
+  }
+  onBeat () {
+
+  }
+  onBar (bar) {
+    const duration = bar.duration * 1000 / 8
+    const originalColor = new Color(this.background)
+    const shadedColor = originalColor.shaded(-0.4)
+    console.log(bar)
+    new TWEEN.Tween(originalColor.copy())
+      .to(shadedColor, duration)
+      .easing(TWEEN.Easing.Quadratic.Out)
+      .onUpdate(val => {
+        this.background = val.toRGBFunc()
+      })
+      .onComplete(() => {
+        new TWEEN.Tween(shadedColor.copy())
+          .to(originalColor, duration)
+          .easing(TWEEN.Easing.Quadratic.In)
+          .onUpdate(val => {
+            this.background = val.toRGBFunc()
+          })
+          .start()
+      })
+      .start()
+  }
+  onLoad () {
+    this.sectionCircle = this.renderer.makeCircle(0, 0, 0).noStroke()
+  }
+
+  get background () {
+    return this.renderer.scene.parent.domElement.style['background-color']
+  }
+  set background (val) {
+    this.renderer.scene.parent.domElement.style['background-color'] = val
   }
 }

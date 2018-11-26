@@ -18,13 +18,18 @@ export default class AudioAnalysis {
     bars: 0,
     beats: 0,
     tatums: 0,
+    sections: 0,
+    segments: 0,
   }
   lastCheckIndex = {
     bars: -1,
     beats: -1,
     tatums: -1,
+    sections: -1,
+    segments: -1,
   }
-  // Key: bars, beats, tatums
+  // Key: bars, beats, tatums, sections, segments
+  // Returns a time interval object
   check (key, time) {
     if (time <= this.lastCheckTime[key]) {
       // Trace back
@@ -39,7 +44,7 @@ export default class AudioAnalysis {
       this.lastCheckIndex[key]++
       const timeDiff = time - this[key][this.lastCheckIndex[key]].start // n milliseconds since the beat
       if (timeDiff < 1) { // Less than 1 seconds since the beat
-        return true
+        return this[key][this.lastCheckIndex[key]] // Return the current beat
       }
     }
     return false
