@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import * as TWEEN from '@tweenjs/tween.js'
-import Lyrics from 'lyrics.js'
+import Lyrics from './utils/lyrics'
 import * as Vibrant from 'node-vibrant'
 
-import { shadeColor } from './utils'
+import { shadeColor } from './utils/color'
 
 const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
 const DEFAULT_EASING_DURATION = 800
@@ -66,7 +66,7 @@ export default class Circles {
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight)
 
     this.container.appendChild(this.renderer.domElement)
-    window.addEventListener('resize', this.onWindowResize, false)
+    window.addEventListener('resize', this.onWindowResize.bind(this), false)
 
     const loader = new THREE.FontLoader()
     loader.load('/fonts/Nunito.json', font => {
@@ -312,6 +312,7 @@ export default class Circles {
 
     this.spawnPulse()
 
+    // Animate the background when we're in chorus
     if (this.isChorus(this.currentGroup) && this.currentBeat === 0) {
       const color = this.color.vibrant
       const darken = shadeColor(color, -0.4)
@@ -376,15 +377,14 @@ export default class Circles {
 
       let isNextSection = false
 
-      if (this.useLrcSections) {
+      if (this.useLrcSections) { // When there're more than n empty lines in the lyrics
         if (isWhitespace(it.lyric.text)) {
-          isNextSection = true
+          isNextSection = true // Go into next section when we encounter an empty line
         }
       } else {
-        if (!isNextSection) {
-          if (i > 0 && it.lyric.timestamp - this.lyricTexts[i - 1].lyric.timestamp > LYRIC_GROUP_THRESHOLD) {
-            isNextSection = true
-          }
+        if (i > 0 && it.lyric.timestamp - this.lyricTexts[i - 1].lyric.timestamp > LYRIC_GROUP_THRESHOLD) {
+          // If not the first line, and
+          isNextSection = true
         }
 
         if (!isNextSection) {
@@ -676,7 +676,7 @@ export default class Circles {
       variable: 'opacity',
       easing: DEFAULT_EASING_TYPE,
       duration: DEFAULT_EASING_DURATION,
-      callback: function () {
+      callback: () => {
         text.isFadingIn = false
       }
     })
