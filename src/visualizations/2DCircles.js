@@ -3,7 +3,7 @@ import * as TWEEN from '@tweenjs/tween.js'
 import Visualizer from '.'
 
 import { getRandomPoint } from './utils/geometry'
-import { Color } from './utils/color'
+import Color from './utils/color'
 
 export default class CircleVisualizer extends Visualizer {
   constructor (element, ...args) {

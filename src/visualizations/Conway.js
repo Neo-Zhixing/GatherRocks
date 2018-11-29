@@ -1,5 +1,6 @@
 import Visualizer from '.'
 import * as TWEEN from '@tweenjs/tween.js'
+import Color from './utils/color'
 export default class Conway extends Visualizer {
   constructor (element, ...args) {
     super(element, ...args)
@@ -13,6 +14,7 @@ export default class Conway extends Visualizer {
     this.data = new ConwayCalculator(9, 10)
     this.data.populateRandom()
   }
+  color = new Color(0, 0, 0)
   size = 10
   spawnSize = 0
   killSize = 5
@@ -23,19 +25,18 @@ export default class Conway extends Visualizer {
     this.killSize = radius
     new TWEEN.Tween(this)
       .to({ spawnSize: radius, killSize: 0 }, duration * 0.8)
-      .easing(TWEEN.Easing.Cubic.Out)
       .onUpdate(e => {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
-        this.ctx.fillStyle = 'rgb(0,0,0)'
+        this.ctx.fillStyle = this.color.toRGBFunc()
         this.ctx.beginPath()
         this.data.forEach((x, y, val, lastVal) => {
           x = x * this.size + radius
           y = y * this.size + radius
           this.ctx.moveTo(x, y)
           if (val) {
-            this.ctx.arc(x, y, lastVal ? radius : this.spawnSize, 0, 2 * Math.PI)
+            this.ctx.arc(x, y, lastVal ? radius : e.spawnSize, 0, 2 * Math.PI)
           } else if (lastVal) {
-            this.ctx.arc(x, y, this.killSize, 0, 2 * Math.PI)
+            this.ctx.arc(x, y, e.killSize, 0, 2 * Math.PI)
           }
         })
         this.ctx.fill()
@@ -47,12 +48,26 @@ export default class Conway extends Visualizer {
     TWEEN.update(time)
     const playtime = (time - this.startTime) / 1000
 
-    const val = this.analysis.check('beats', playtime)
+    let val = this.analysis.check('beats', playtime)
     if (val) this.onBeat(val)
+    val = this.analysis.check('segments', playtime)
+    if (val) this.onSegments(val)
   }
   onBeat (beat) {
     this.nextFrame(beat.duration * 1000)
     // setInterval(this.nextFrame().bind(this), 1000)
+  }
+  onSegments (segment) {
+    new TWEEN.Tween(this.color)
+      .to(Color.fromPitches(segment.pitches), segment.duration * 1000 * 0.8)
+      .start()
+  }
+
+  get background () {
+    return new Color(this.canvas.style['background-color'])
+  }
+  set background (val) {
+    this.canvas.style['background-color'] = val.toColorCode()
   }
 }
 
@@ -86,11 +101,11 @@ class ConwayCalculator {
     data[this.indexFor(x, y)] = val ? block | mask : block & ~mask
   }
   wrapCoords (x, y) {
-    if (x < 0) x = 0
-    if (x > this.width * 8 - 1) x = this.width * 8 - 1
-    if (y < 0) y = 0
-    if (y > this.height * 8 - 1) y = this.height * 8 - 1
-    return [x, y]
+    if (x < 0) return false
+    if (x > this.width * 8 - 1) return false
+    if (y < 0) return false
+    if (y > this.height * 8 - 1) return false
+    return true
   }
   countLivingNeighbors (x, y, data) {
     return [
@@ -103,7 +118,7 @@ class ConwayCalculator {
       [1, -1],
       [-1, 1]
     ]
-      .map(([xDir, yDir]) => this.cellAt(...this.wrapCoords(x + xDir, y + yDir), data) | 0)
+      .map(([xDir, yDir]) => this.wrapCoords(x + xDir, y + yDir) ? this.cellAt(x + xDir, y + yDir, data) | 0 : 0)
       .reduce((x, sum) => sum + x)
   }
   next () {
