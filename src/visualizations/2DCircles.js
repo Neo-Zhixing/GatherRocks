@@ -19,17 +19,8 @@ export default class CircleVisualizer extends Visualizer {
 
     this.background = '#FFFFFF'
   }
-  loaded = false
-  load () {
-    super.load(...arguments)
-    if (!this.loaded) {
-      this.loaded = true
-      this.onLoad()
-      requestAnimationFrame(this.update.bind(this))
-    }
-  }
   update (time) {
-    requestAnimationFrame(this.update.bind(this))
+    super.update(time)
     TWEEN.update(time)
     this.renderer.update()
 
