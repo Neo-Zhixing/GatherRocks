@@ -2,9 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Conway Grid Editor</title>
 </head>
 <body>
-  <canvas></canvas>
+  <canvas id="canvas"></canvas>
+  <p id="position"></p>
+  <button id="next">Next</button>
+  <div id="pattern">
+    <textarea id="pattern-input"></textarea>
+    <input id="pattern-input-x" placeholder="x">
+    <input id="pattern-input-y" placeholder="y">
+    <button id="pattern-load">Load</button>
+  </div>
+
+
+  <script
+    src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+    integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E="
+    crossorigin="anonymous"></script>
+  <script type="module">
+    import Editor from './editor.js'
+    const canvas = document.getElementById('canvas')
+    const editor = new Editor(canvas)
+    editor.draw()
+
+    $('#canvas').mousemove(event => {
+      const x = ~~(event.offsetX / 10)
+      const y = ~~(event.offsetY / 10)
+      $('#position').text(`${x}:${y}`)
+    })
+    $('#next').click(event => {
+      editor.game.next()
+      editor.draw()
+      console.log(event)
+    })
+    $('#pattern-load').click(event => {
+      const pattern = $('#pattern-input').val()
+      const x = parseInt($('#pattern-input-x').val()) || 0
+      const y = parseInt($('#pattern-input-y').val()) || 0
+      editor.game.loadPattern(pattern, x, y)
+      editor.draw()
+    })
+  </script>
+  <style>
+    #canvas {
+      border-style: solid;
+    }
+  </style>
 </body>
 </html>
