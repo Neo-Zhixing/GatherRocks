@@ -6,9 +6,7 @@ export default class ConwayGame {
     this.buffer = new Uint8Array(width * height * 8)
   }
   populateRandom () {
-    for (let i = 0; i < this.width * this.height * 8; i++) {
-      this.data[i] = Math.floor(Math.random() * 256)
-    }
+    window.crypto.getRandomValues(this.data)
   }
   loadPattern (pattern, initialX = 0, initialY = 0) {
     // pattern: "width@height@patternData"

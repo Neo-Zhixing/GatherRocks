@@ -4,7 +4,8 @@ import Color from '../utils/color'
 
 import Game from './game'
 
-import Patterns from './Patterns.json'
+// import Patterns from './Patterns.json'
+
 export default class Conway extends Visualizer {
   constructor (element, ...args) {
     super(element, ...args)
@@ -12,11 +13,13 @@ export default class Conway extends Visualizer {
     this.canvas.id = 'conway'
     this.canvas.width = element.clientWidth
     this.canvas.height = element.clientHeight
+
+    const numY = Math.floor(Math.sqrt(this.canvas.height) / 4)
+    this.size = this.canvas.height / (numY * 8)
     element.appendChild(this.canvas)
 
     this.ctx = this.canvas.getContext('2d')
-    this.data = new Game(10, 10)
-    this.data.loadPattern(Patterns.gun, 3, 3)
+    this.data = new Game(Math.ceil((this.canvas.width / this.canvas.height) * numY), numY)
   }
   color = new Color(0, 0, 0)
   size = 10
@@ -30,6 +33,10 @@ export default class Conway extends Visualizer {
       .to({ spawnSize: this.size / 2, killSize: 0 }, duration * 0.8)
       .onUpdate(this.draw.bind(this))
       .start()
+  }
+  load () {
+    super.load(...arguments)
+    this.data.populateRandom()
   }
   draw () {
     const radius = this.size / 2
@@ -70,8 +77,7 @@ export default class Conway extends Visualizer {
       .start()
   }
   onSections (section) {
-    console.log(section)
-    //this.data.populateRandom()
+    this.data.populateRandom()
   }
   get background () {
     return new Color(this.canvas.style['background-color'])
