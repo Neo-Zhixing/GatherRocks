@@ -15,18 +15,40 @@ export default class ConwayGame {
     const params = pattern.split('@')
     const widthToLoad = params[0]
     const heightToLoad = params[1]
+    const setValue = (index, value) => {
+      const x = index % widthToLoad
+      const y = ~~(index / heightToLoad)
+      this.data[(x + initialX) + (y + initialY) * this.width] = value
+    }
+    for (let i = 0; i < widthToLoad * heightToLoad * 8; i++) {
+      setValue(i, 0) // Pre-populate with 0
+    }
     params[2] // patternData index:value|index2:value2|...
       .split('|') // ["index:value", "index2:value2", ...] all numbers in hex
       .map(c => c.split(':').map(a => parseInt(a, 16))) // [[index,value], [index2,value2], ...]
-      .forEach(([index, value]) => {
-        const x = index % widthToLoad
-        const y = ~~(index / heightToLoad)
-        this.data[(x + initialX) + (y + initialY) * this.width] = value
-      }) // Populate this.data
+      .forEach(([index, value]) => setValue(index, value)) // Populate this.data
+  }
+  getPattern (initialX, initialY, width, height) {
+    initialX = ~~(initialX / 8)
+    width = ~~(width / 8)
+    const pattern = []
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const value = this.data[(x + initialX) + (y + initialY) * this.width]
+        if (value === 0) continue
+        pattern.push(
+          (y * width + x).toString(16) +
+          ':' +
+          value.toString(16)
+        )
+      }
+    }
+    return width + '@' + Math.ceil(height / 8) + '@' + pattern.join('|')
   }
   indexFor (x, y) {
     return y * this.width + ~~(x / 8) // ~~: Math.floor
   }
+  // State Compression
   cellAt (x, y, data) {
     if (!data) data = this.data
     const block = data[this.indexFor(x, y)]

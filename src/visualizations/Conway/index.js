@@ -1,10 +1,10 @@
-import Visualizer from '.'
+import Visualizer from '..'
 import * as TWEEN from '@tweenjs/tween.js'
-import Color from './utils/color'
+import Color from '../utils/color'
 
 import Game from './game'
 
-import Patterns from './ConwayPatterns.json'
+import Patterns from './Patterns.json'
 export default class Conway extends Visualizer {
   constructor (element, ...args) {
     super(element, ...args)
