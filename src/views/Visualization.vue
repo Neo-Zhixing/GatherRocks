@@ -7,7 +7,7 @@
 </template>
 
 <script>
-import Visualizer from '@/visualizations'
+import Visualizer from '@/visualizations/Conway'
 export default {
   name: 'visualization',
   props: {

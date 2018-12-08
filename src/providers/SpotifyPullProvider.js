@@ -20,6 +20,7 @@ class SpotifyPullProvider {
 
   start () {
     this._puller = setInterval(this.pull.bind(this), this.pullingInterval)
+    this.pull()
   }
 
   stop () {
@@ -39,6 +40,8 @@ class SpotifyPullProvider {
     }
     const track = playback.item
     if (this.track && (this.track.id === track.id)) {
+      // Still play the last one
+      this.target.seek(playback.progress_ms)
       return
     }
     this.track = track
@@ -51,7 +54,6 @@ class SpotifyPullProvider {
           return axios.get(`https://api.imjad.cn/cloudmusic/?type=lyric&id=${id}`)
         })
     ]).then(([analysis, lyrics]) => [analysis.data, lyrics && lyrics.data])
-    console.log(analysis, lyrics)
     lyrics = lyrics && lyrics.lrc && lyrics.lrc.lyric
     const t1 = performance.now()
     this.target.load(
@@ -60,6 +62,7 @@ class SpotifyPullProvider {
       playback.progress_ms + (t1 - t0),
       track.album.images[0].url,
       track.name + ' - ' + track.artists[0])
+    this.target.seek(playback.progress_ms + (t1 - t0))
     return 0
   }
   login () {
