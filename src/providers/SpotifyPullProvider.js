@@ -32,7 +32,6 @@ class SpotifyPullProvider {
   async pull () {
     if (!this.target) { return }
     const response = await this.client.get('me/player/currently-playing')
-    const t0 = performance.now()
     const playback = response.data
     if (!playback.is_playing) {
       // TODO: Not playing anything.
@@ -45,25 +44,25 @@ class SpotifyPullProvider {
       return
     }
     this.track = track
-    let [analysis, lyrics] = await Promise.all([
-      this.client.get(`/audio-analysis/${track.id}`),
-      axios.get(`https://api.imjad.cn/cloudmusic/?type=search&search_type=1&s=${track.name + ' ' + track.artists.map(a => a.name).join(' ')}`)
-        .then(response => {
-          if (!response.data.result.songs) return null
-          const id = response.data.result.songs[0].id
-          return axios.get(`https://api.imjad.cn/cloudmusic/?type=lyric&id=${id}`)
-        })
-    ]).then(([analysis, lyrics]) => [analysis.data, lyrics && lyrics.data])
-    lyrics = lyrics && lyrics.lrc && lyrics.lrc.lyric
-    const t1 = performance.now()
-    this.target.load(
-      analysis,
-      lyrics,
-      playback.progress_ms + (t1 - t0),
-      track.album.images[0].url,
-      track.name + ' - ' + track.artists[0])
-    this.target.seek(playback.progress_ms + (t1 - t0))
-    return 0
+    this.target.load(track, this, playback.progress_ms)
+  }
+  async getLyrics (track) {
+    if (!track) track = this.track
+    let response = await axios.get(`https://api.imjad.cn/cloudmusic/?type=search&search_type=1&s=${track.name + ' ' + track.artists.map(a => a.name).join(' ')}`)
+    if (!response.data.result.songs) return null
+    const id = response.data.result.songs[0].id
+    response = await axios.get(`https://api.imjad.cn/cloudmusic/?type=lyric&id=${id}`)
+    return response && response.data && response.data.lrc && response.data.lrc.lyric
+  }
+  getAnalysis (track) {
+    if (!track) track = this.track
+    return this.client.get(`/audio-analysis/${track.id}`)
+      .then(response => response.data)
+  }
+  getPalette (track) {
+    if (!track) track = this.track
+    return axios.get('//app.gather.rocks/utils/imgcolor/' + track.id)
+      .then(response => response.data.map(hexCode => '#' + hexCode))
   }
   login () {
     return new Promise((resolve, reject) => {

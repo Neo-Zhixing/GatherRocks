@@ -1,10 +1,9 @@
 import * as THREE from 'three'
 import * as TWEEN from '@tweenjs/tween.js'
-import Lyrics from './utils/lyrics'
-import * as Vibrant from 'node-vibrant'
 
 import { shadeColor } from './utils/color'
 import { getRandomDouble } from './utils/geometry'
+import Visualizer from './index'
 
 const DEFAULT_EASING_TYPE = TWEEN.Easing.Quadratic.InOut
 const DEFAULT_EASING_DURATION = 800
@@ -17,8 +16,7 @@ const IN_NEGATIVE_THRESHOLD = -0.2
 const totalChorusLayout = 1
 const totalVerseLayout = 2
 
-export default class Circles {
-  container = null
+export default class Circles extends Visualizer {
   playtime = 0
   startPlaytime = null
   startPerformanceTime = null
@@ -37,12 +35,6 @@ export default class Circles {
 
   lrc = null
 
-  color = {
-    dark: '#871b42',
-    primary: '#000000',
-    vibrant: '#871b42',
-  }
-
   useLrcSectionsConfidence = 0
 
   currentChorusLayout = 0
@@ -55,8 +47,7 @@ export default class Circles {
   completedTween = true
 
   constructor (element) {
-    this.container = element
-
+    super(element)
     this.camera = new THREE.PerspectiveCamera(CAMERA_VERSE_FOV, this.container.clientWidth / this.container.clientHeight, 0.01, 2000)
     this.camera.position.set(0, 0, CAMERA_INITIAL_Z)
     this.scene = new THREE.Scene()
@@ -76,25 +67,22 @@ export default class Circles {
     this.animate()
   }
 
-  load (analysis, lyrics, time, cover) {
+  async load (track, provider, time) {
+    super.load(track, provider)
+    const [analysis, lyrics] = await Promise.all([
+      this.loadAnalysis(),
+      this.loadLyrics(),
+      this.loadPalette(),
+    ])
+
     this.isLoaded = false
-    this.cover = cover
 
-    if (this.cover) {
-      Vibrant.from(this.cover).getPalette()
-        .then(palette => {
-          this.color.dark = palette.DarkMuted.getHex()
-          this.color.primary = palette.DarkVibrant.getHex()
-          this.color.vibrant = palette.Vibrant.getHex()
-        })
-    }
-
-    if (lyrics != null) {
+    if (lyrics) {
       const t = window.performance.now()
 
       if (!time) time = 0
       this.analysis = analysis
-      this.lrc = new Lyrics(lyrics)
+      this.lrc = lyrics
       const delay = (window.performance.now() - t) / 1000
 
       this.startPlaytime = time / 1000 + delay - 0.5
@@ -142,7 +130,7 @@ export default class Circles {
       console.log('Resetting scene')
 
       this.reset()
-      if (lyrics != null) {
+      if (lyrics) {
         this.onLoaded()
       }
     }

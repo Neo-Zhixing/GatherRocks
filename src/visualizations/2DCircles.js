@@ -20,8 +20,9 @@ export default class CircleVisualizer extends Visualizer {
     this.background = '#FFFFFF'
   }
   loaded = false
-  load () {
+  async load () {
     super.load(...arguments)
+    await this.loadAnalysis()
     if (!this.loaded) {
       this.loaded = true
       this.onLoad()
