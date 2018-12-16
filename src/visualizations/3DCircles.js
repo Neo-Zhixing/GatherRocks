@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import * as TWEEN from '@tweenjs/tween.js'
 
-import { shadeColor } from './utils/color'
 import { getRandomDouble } from './utils/geometry'
 import Visualizer from './index'
 
@@ -246,7 +245,7 @@ export default class Circles extends Visualizer {
     const groupMultiplier = this.currentGroup != null ? ((this.currentGroup.avg_loudness - this.analysis.track.loudness_min) / (this.analysis.track.loudness_max - this.analysis.track.loudness_min)) : 1
 
     const material = new THREE.MeshBasicMaterial({
-      color: (this.currentBeat === 0 && this.isChorus(this.currentGroup)) ? this.color.dark : this.color.primary,
+      color: (this.currentBeat === 0 && this.isChorus(this.currentGroup)) ? this.color.dark.toRGBFunc() : this.color.primary.toRGBFunc(),
       transparent: true,
       opacity: 0,
     })
@@ -303,8 +302,9 @@ export default class Circles extends Visualizer {
 
     // Animate the background when we're in chorus
     if (this.isChorus(this.currentGroup) && this.currentBeat === 0) {
-      const color = this.color.vibrant
-      const darken = shadeColor(color, -0.4)
+      const color = this.color.vibrant.toRGBFunc()
+      if (!this.color.vibrantDarken) this.color.vibrantDarken = this.color.vibrant.shaded(-0.4)
+      const darken = this.color.vibrantDarken.toRGBFunc()
       new TWEEN.Tween(new THREE.Color(color))
         .to(new THREE.Color(darken), 200)
         .easing(TWEEN.Easing.Quadratic.Out)
@@ -607,7 +607,7 @@ export default class Circles extends Visualizer {
 
     const circleGeometry = new THREE.CircleGeometry(300, 64)
     const circle = new THREE.Mesh(circleGeometry, new THREE.MeshBasicMaterial({
-      color: this.isChorus() ? this.color.dark : '#ffffff',
+      color: this.isChorus() ? this.color.dark.toRGBFunc() : '#ffffff',
       transparent: true,
       opacity: 0
     }))
@@ -624,7 +624,7 @@ export default class Circles extends Visualizer {
       duration: 1000,
       update: d => {
         if (circle.position.z - this.camera.position.z > -10) {
-          this.scene.background = new THREE.Color(this.isChorus() ? this.color.vibrant : '#ffffff')
+          this.scene.background = new THREE.Color(this.isChorus() ? this.color.vibrant.toRGBFunc() : '#ffffff')
           this.scene.remove(circle)
         }
       }

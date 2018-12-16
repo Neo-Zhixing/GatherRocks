@@ -1,5 +1,8 @@
 import axios from 'axios'
+import ColorThief from 'color-thief'
 import Cached from '@/utils/cache'
+
+const colorThief = new ColorThief()
 
 class SpotifyPullProvider {
   constructor () {
@@ -61,8 +64,11 @@ class SpotifyPullProvider {
   }
   getPalette (track) {
     if (!track) track = this.track
-    return axios.get('//app.gather.rocks/utils/imgcolor/' + track.id)
-      .then(response => response.data.map(hexCode => '#' + hexCode))
+    return colorThief.getColorFromUrl(track.album.images[0].url, 3, 5)
+      .then(palette => {
+        console.log(palette)
+        return palette
+      })
   }
   login () {
     return new Promise((resolve, reject) => {

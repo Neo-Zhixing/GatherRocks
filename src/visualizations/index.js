@@ -1,5 +1,6 @@
 import Analysis from './utils/AudioAnalysis'
 import Lyrics from './utils/lyrics'
+import Color from './utils/color'
 export default class Visualizer {
   provider = null
   constructor (element) {
@@ -37,6 +38,7 @@ export default class Visualizer {
   loadPalette () {
     this.provider.getPalette()
       .then(palette => {
+        palette = palette.map(colorArray => new Color(...colorArray))
         this.color = {
           dark: palette[0],
           primary: palette[1],
