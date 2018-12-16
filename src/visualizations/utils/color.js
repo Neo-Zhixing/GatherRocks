@@ -30,6 +30,16 @@ export default class Color {
     const colors = [0, 1, 2].map(() => Math.random())
     return new Color(...colors)
   }
+  static fromPitches (pitches) {
+    const adder = (a, sum) => a + sum
+    const r = pitches.slice(0, 4).reduce(adder) / 3
+    const g = pitches.slice(4, 8).reduce(adder) / 3
+    const b = pitches.slice(8, 12).reduce(adder) / 3
+    return new Color(r, g, b)
+  }
+  contrastColor () {
+    return new Color(1 - this.r, 1 - this.g, 1 - this.b)
+  }
   shaded (percent) {
     const colors = ColorCodeKeyOrder
       .map(key => this[key] * (1 + percent)) // turn keys into corresponding colors

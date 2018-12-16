@@ -3,7 +3,7 @@ import * as TWEEN from '@tweenjs/tween.js'
 import Visualizer from '.'
 
 import { getRandomPoint } from './utils/geometry'
-import { Color } from './utils/color'
+import Color from './utils/color'
 
 export default class CircleVisualizer extends Visualizer {
   constructor (element, ...args) {
@@ -30,7 +30,7 @@ export default class CircleVisualizer extends Visualizer {
     }
   }
   update (time) {
-    requestAnimationFrame(this.update.bind(this))
+    super.update(time)
     TWEEN.update(time)
     this.renderer.update()
 
