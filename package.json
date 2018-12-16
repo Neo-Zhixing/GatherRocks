@@ -14,7 +14,7 @@
     "@fortawesome/vue-fontawesome": "^0.1.2",
     "@tweenjs/tween.js": "^17.2.0",
     "axios": "^0.18.0",
-    "node-vibrant": "^3.0.0",
+    "color-thief": "Neo-Zhixing/color-thief",
     "register-service-worker": "^1.0.0",
     "three": "^0.98.0",
     "two.js": "^0.7.0-beta.2",
